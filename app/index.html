@@ -24,12 +24,11 @@
 	<script src="./lib/rickshaw/js/Rickshaw.Graph.HoverDetail.js"></script>
 	<script src="./lib/rickshaw/js/Rickshaw.Graph.Annotate.js"></script>
 	<script src="./lib/rickshaw/js/Rickshaw.Graph.Legend.js"></script>
-	<script src="./lib/rickshaw/js/Rickshaw.Graph.Axis.Time.js"></script>
+	<script src="./lib/rickshaw/js/Rickshaw.Graph.Axis.X.js"></script>
 	<script src="./lib/rickshaw/js/Rickshaw.Graph.Behavior.Series.Toggle.js"></script>
 	<script src="./lib/rickshaw/js/Rickshaw.Graph.Behavior.Series.Order.js"></script>
 	<script src="./lib/rickshaw/js/Rickshaw.Graph.Behavior.Series.Highlight.js"></script>
 	<script src="./lib/rickshaw/js/Rickshaw.Graph.Smoother.js"></script>
-	<script src="./lib/rickshaw/js/Rickshaw.Graph.Unstacker.js"></script>
 	<script src="./lib/rickshaw/js/Rickshaw.Fixtures.Time.js"></script>
 	<script src="./lib/rickshaw/js/Rickshaw.Fixtures.Time.Local.js"></script>
 	<script src="./lib/rickshaw/js/Rickshaw.Fixtures.Number.js"></script>
@@ -112,16 +111,49 @@
 
 // set up our data series with 150 random data points
 
-var seriesData = [ [], [], [], [], [], [], [], [], [] ];
-var random = new Rickshaw.Fixtures.RandomData(150);
-
-for (var i = 0; i < 150; i++) {
-	random.addData(seriesData);
-}
-
+var seriesData = null;
 var palette = new Rickshaw.Color.Palette( { scheme: 'classic9' } );
 
 // instantiate our graph!
+
+var fetch = function() {
+  console.log("fetch");
+	var xhr = new XMLHttpRequest();
+	xhr.open("GET", "./national_gdp.json");
+	xhr.onload = function() {
+	  var active = graph.series.active;
+	  var seriesData = JSON.parse(xhr.responseText);
+	  maps.gdp = seriesData.map(function(d) { return { x: d.year * 1, y: d.gdp * 1 }}));
+	  maps.real = seriesData.map(function(d) { return { x: d.year * 1, y: d.real_gdp * 1 }});
+	  graph.series = makeSeries(maps.gdp, maps.real);
+	  graph.series.active = active;
+	  onUpdate();
+	}
+	xhr.send();
+	setTimeout(fetch, 10*1000);
+};
+fetch();
+
+var maps = { gdp: [], real: [] };
+
+var onUpdate = function() {
+  graph.render();
+};
+
+var makeSeries = function(one, two) {
+  return [
+        {
+            color: "#808",
+            data: one || [{x: 0, y: 0}],
+            name: 'GDP'
+        },
+        {
+            color: "orange",
+            data: two || [{x: 0, y: 0}],
+            name: "Real GDP"
+        }
+    ]
+};
 
 var graph = new Rickshaw.Graph( {
 	element: document.getElementById("chart"),
@@ -130,40 +162,11 @@ var graph = new Rickshaw.Graph( {
 	renderer: 'area',
 	stroke: true,
 	preserve: true,
-	series: [
-		{
-			color: palette.color(),
-			data: seriesData[0],
-			name: 'Moscow'
-		}, {
-			color: palette.color(),
-			data: seriesData[1],
-			name: 'Shanghai'
-		}, {
-			color: palette.color(),
-			data: seriesData[2],
-			name: 'Amsterdam'
-		}, {
-			color: palette.color(),
-			data: seriesData[3],
-			name: 'Paris'
-		}, {
-			color: palette.color(),
-			data: seriesData[4],
-			name: 'Tokyo'
-		}, {
-			color: palette.color(),
-			data: seriesData[5],
-			name: 'London'
-		}, {
-			color: palette.color(),
-			data: seriesData[6],
-			name: 'New York'
-		}
-	]
+	series: makeSeries()
 } );
 
 graph.render();
+
 
 var slider = new Rickshaw.Graph.RangeSlider( {
 	graph: graph,
@@ -172,8 +175,12 @@ var slider = new Rickshaw.Graph.RangeSlider( {
 
 var hoverDetail = new Rickshaw.Graph.HoverDetail( {
 	graph: graph,
-	xFormatter: function(x) {
-		return new Date(x * 1000).toString();
+	yFormatter: function(x) {
+		var millions = x / (1000000 * 1000) + "";
+		for (var i = millions.indexOf(".") - 3 || millions.length - 3; i > 0; i -= 3) {
+		  millions = millions.substr(0, i) + "," + millions.substr(i);
+		}
+		return millions + "B";
 	}
 } );
 
@@ -210,10 +217,9 @@ var smoother = new Rickshaw.Graph.Smoother( {
 
 var ticksTreatment = 'glow';
 
-var xAxis = new Rickshaw.Graph.Axis.Time( {
+var xAxis = new Rickshaw.Graph.Axis.X( {
 	graph: graph,
-	ticksTreatment: ticksTreatment,
-	timeFixture: new Rickshaw.Fixtures.Time.Local()
+	ticksTreatment: ticksTreatment
 } );
 
 xAxis.render();
@@ -244,22 +250,6 @@ var messages = [
 	"Rewrite conditional logic for clarity",
 	"Added documentation for new methods"
 ];
-
-setInterval( function() {
-	random.removeData(seriesData);
-	random.addData(seriesData);
-	graph.update();
-
-}, 3000 );
-
-function addAnnotation(force) {
-	if (messages.length > 0 && (force || Math.random() >= 0.95)) {
-		annotator.add(seriesData[2][seriesData[2].length-1].x, messages.shift());
-	}
-}
-
-addAnnotation(true);
-setTimeout( function() { setInterval( addAnnotation, 6000 ) }, 6000 );
 
 </script>
 
